@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 
 namespace GraphGeneration
 {
     class Graph
     {
         private bool[,] _adjacencyMatrix;
-        public readonly HashSet<Edge> EdgeSet;
+        public readonly List<Edge> EdgeSet;
+        public readonly List<Vertex> VertexSet;
 
         //graph parameters
         public int Order { get; set; }
@@ -20,16 +21,32 @@ namespace GraphGeneration
         {
             Order = order;
             _adjacencyMatrix = new bool[order, order];
-            EdgeSet = new HashSet<Edge>();
+            EdgeSet = new List<Edge>();
+            VertexSet = new List<Vertex>();
+
+            for (int i = 0; i < order; i++)
+                VertexSet.Add(new Vertex(i));
         }
 
-        public void AddEdge(int v1, int v2)
+        public bool AddEdge(int v1, int v2, bool directional = false)
         {
             Edge e = new Edge(v1, v2);
-            EdgeSet.Add(e);
-            Size++;
-            _adjacencyMatrix[v1, v2] = true;
-            _adjacencyMatrix[v2, v1] = true;
+
+            if (v1 != v2 && !EdgeSet.Contains(e))
+            {
+                Size++;
+                _adjacencyMatrix[v1, v2] = true;
+                EdgeSet.Add(e);
+
+                if (!directional)
+                    _adjacencyMatrix[v2, v1] = true;
+
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         public void CalculateGraphParameters()
@@ -40,7 +57,6 @@ namespace GraphGeneration
 
             int degree;
 
-            //find max degree and connectedness
             for (int i = 0; i < Order; i++)
             {
                 degree = 0;
@@ -67,14 +83,58 @@ namespace GraphGeneration
 
         public bool IsAdjacent(int v1, int v2)
         {
-            return _adjacencyMatrix[v1, v2] || _adjacencyMatrix[v2, v1];
+            return v1 != v2 && (_adjacencyMatrix[v1, v2] || _adjacencyMatrix[v2, v1]);
+        }
+
+        private static bool TestConnectivityBFS(Graph g, out List<int> disconnectedVertices)
+        {
+            Queue<int> visited = new Queue<int>();
+            Queue<int> adjQueue = new Queue<int>();
+
+            adjQueue.Enqueue(0); //starting vertex
+            int visitingVtx;
+
+            while (adjQueue.Count > 0)
+            {
+                visitingVtx = adjQueue.Dequeue();
+                visited.Enqueue(visitingVtx);
+
+                for (int i = 0; i < g.Order; i++)
+                {
+                    if (!visited.Contains(i) 
+                        && g.IsAdjacent(visitingVtx, i))
+                    {
+                        adjQueue.Enqueue(i);
+                    }
+                }
+            }
+
+            // any v not visited is not connected
+            disconnectedVertices = new List<int>();
+
+            if (visited.Count == g.Order)
+            {
+                return true;
+            }
+            else
+            {
+                for (int i = 0; i < g.Order; i++)
+                {
+                    if (!visited.Contains(i))
+                    {
+                        disconnectedVertices.Add(i);
+                    }
+                }
+
+                return false;
+            }
         }
 
         public static Graph RandomConnectedGraph(int order)
         {
             Random random = new Random();
 
-            int size = random.Next(order - 1, order * (order - 1));
+            int size = random.Next(order - 1, order * (order - 1) / 2);
             
             Graph graph = new Graph(order);
             
@@ -84,17 +144,45 @@ namespace GraphGeneration
                 int v2 = random.Next(order);
                                 
                 graph.AddEdge(v1, v2);
-            }
+            }            
 
-            graph.CalculateGraphParameters();
-
-            //graph is not connected
-            if (graph.MinDegree < order * (order - 1) / 2)
+            //add bridges to these vertices if not connected
+            List<int> disconnectedVertices;
+            
+            if (TestConnectivityBFS(graph, out disconnectedVertices))
             {
-                //add bridges
+                graph.CalculateGraphParameters();
+                return graph;
             }
+            else
+            {
+                List<int> visited = new List<int>();
 
-            return graph;
+                //find connected subgraph - add bridges to disconnectedVertices
+                for (int i = 0; i < order; i++)
+                {
+                    if (!disconnectedVertices.Contains(i))
+                    {
+                        visited.Add(i);
+                    }
+                }
+
+                while (visited.Count < order)
+                {
+                    //select random vertex from connected subgraph
+                    int randIndex = random.Next(visited.Count);
+                    int disconnVertex = disconnectedVertices.First();
+
+                    if (graph.AddEdge(visited[randIndex], disconnVertex))
+                    {
+                        visited.Add(disconnVertex);
+                        disconnectedVertices.RemoveAt(0);
+                    }
+                }
+
+                graph.CalculateGraphParameters();
+                return graph;
+            }
         }
 
         public static Graph CompleteGraph(int order)
@@ -129,5 +217,30 @@ namespace GraphGeneration
 
             return g;
         }        
+
+        public override string ToString()
+        {
+            string display = string.Empty;
+
+            display += $"Order: {Order}\n";
+            display += $"Size: {Size}\n";
+            display += $"Max Degree: {MaxDegree}\n";
+            display += $"Min Degree: {MinDegree}\n";
+
+            for (int i = 0; i < Order; i++)
+            {
+                display += $"{i}: ";
+
+                for (int j = 0; j < Order; j++)
+                {
+                    if (IsAdjacent(i, j))
+                        display += $"{j}  ";
+                }
+
+                display += "\n";
+            }
+
+            return display;
+        }
     }
 }

@@ -1,13 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace GraphGeneration
+﻿namespace GraphGeneration
 {
     public class Edge
     {
         public int Vertex1 { get; set; }
         public int Vertex2 { get; set; }
+        public int Weight { get; set; }
+        public int Color { get; set; }
 
         public Edge(int v1, int v2)
         {
@@ -27,6 +25,11 @@ namespace GraphGeneration
                 return (Vertex1 == e.Vertex1 && Vertex2 == e.Vertex2)
                     || (Vertex2 == e.Vertex1 && Vertex1 == e.Vertex2);
             }
+        }
+
+        public override int GetHashCode()
+        {
+            return this.GetHashCode();
         }
     }
 }
