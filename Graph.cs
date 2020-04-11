@@ -2,97 +2,132 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace MapGeneration
+namespace GraphGeneration
 {
     class Graph
     {
+        private bool[,] _adjacencyMatrix;
+        public readonly HashSet<Edge> EdgeSet;
+
         //graph parameters
-        public int NumOfEdges { get; set; }
+        public int Order { get; set; }
+        public int Size { get; set; }
         public int MaxDegree { get; set; }
+        public int MinDegree { get; set; }
         public int DegreeSum { get; set; }
+        
+        public Graph(int order)
+        {
+            Order = order;
+            _adjacencyMatrix = new bool[order, order];
+            EdgeSet = new HashSet<Edge>();
+        }
 
-        private HashSet<Edge> _edgeSet = new HashSet<Edge>();
-
-        public void addEdge(int v1, int v2)
+        public void AddEdge(int v1, int v2)
         {
             Edge e = new Edge(v1, v2);
-            _edgeSet.Add(e);
-            NumOfEdges++;
+            EdgeSet.Add(e);
+            Size++;
+            _adjacencyMatrix[v1, v2] = true;
+            _adjacencyMatrix[v2, v1] = true;
+        }
+
+        public void CalculateGraphParameters()
+        {
+            DegreeSum = 2 * Size;
+            MaxDegree = 0;
+            MinDegree = Order * (Order - 1);
+
+            int degree;
+
+            //find max degree and connectedness
+            for (int i = 0; i < Order; i++)
+            {
+                degree = 0;
+
+                for (int j = 0; j < Order; j++)
+                {
+                    if (_adjacencyMatrix[i, j] && i != j)
+                    {
+                        degree++;
+                    }
+                }
+
+                if (degree > MaxDegree)
+                {
+                    MaxDegree = degree;
+                }
+
+                if (degree < MinDegree)
+                {
+                    MinDegree = degree;
+                }
+            }
         }
 
         public bool IsAdjacent(int v1, int v2)
         {
-            return (_edgeSet.Contains(new Edge(v1, v2)) || _edgeSet.Contains(new Edge(v2, v1)));
+            return _adjacencyMatrix[v1, v2] || _adjacencyMatrix[v2, v1];
         }
 
-        public static Graph RandomGraph(int order, int size)
+        public static Graph RandomConnectedGraph(int order)
         {
-            if (size < 0 || size > (order * (order - 1) / 2))
-                throw new Exception();
-            
-            Graph graph = new Graph();
             Random random = new Random();
 
-            graph.DegreeSum = 2 * size;
+            int size = random.Next(order - 1, order * (order - 1));
             
-            while (graph.NumOfEdges < size)
+            Graph graph = new Graph(order);
+            
+            while (graph.Size < size)
             {
                 int v1 = random.Next(order);
                 int v2 = random.Next(order);
                                 
-                graph.addEdge(v1, v2);
+                graph.AddEdge(v1, v2);
             }
 
-            //find max degree and connectedness
+            graph.CalculateGraphParameters();
+
+            //graph is not connected
+            if (graph.MinDegree < order * (order - 1) / 2)
+            {
+                //add bridges
+            }
 
             return graph;
         }
 
-        public static Graph EmptyGraph(int size)
+        public static Graph CompleteGraph(int order)
         {
-            return new Graph();
+            Graph g = new Graph(order);
+
+            for (int i = 0; i < order; i++)
+            {
+                for (int j = i + 1; j < order; j++)
+                {
+                    g.AddEdge(i, j);
+                }
+            }
+
+            return g;
         }
 
         public static Graph Copy(Graph graph)
         {
-            Graph g = new Graph
+            Graph g = new Graph(graph.Order)
             {
-                NumOfEdges = graph.NumOfEdges,
+                Size = graph.Size,
                 MaxDegree = graph.MaxDegree,
                 DegreeSum = graph.DegreeSum
             };
 
             //copy hash set contents
-            foreach (Edge e in graph._edgeSet)
+            foreach (Edge e in graph.EdgeSet)
             {
-                g._edgeSet.Add(e);
+                g.AddEdge(e.Vertex1, e.Vertex2);
             }
+
             return g;
-        }
-
-        private class Edge
-        {
-            public int Vertex1 { get; set; }
-            public int Vertex2 { get; set; }
-
-            public Edge(int v1, int v2)
-            {
-                Vertex1 = v1;
-                Vertex2 = v2;
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (!GetType().Equals(obj.GetType()))
-                {
-                    return false;
-                }
-                else
-                {
-                    Edge e = (Edge)obj;
-                    return (Vertex1 == e.Vertex1 && Vertex2 == e.Vertex2);
-                }
-            }
-        }
+        }        
     }
 }
