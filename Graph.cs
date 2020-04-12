@@ -32,7 +32,7 @@ namespace GraphGeneration
         {
             Edge e = new Edge(v1, v2);
 
-            if (v1 != v2 && !EdgeSet.Contains(e))
+            if (v1 != v2 && !_adjacencyMatrix[v1, v2])
             {
                 Size++;
                 _adjacencyMatrix[v1, v2] = true;
@@ -86,9 +86,12 @@ namespace GraphGeneration
             return v1 != v2 && (_adjacencyMatrix[v1, v2] || _adjacencyMatrix[v2, v1]);
         }
 
-        private static bool TestConnectivityBFS(Graph g, out List<int> disconnectedVertices)
+        private static bool TestConnectivityBFS(
+            Graph g, 
+            out List<int> disconnectedVertices, 
+            out List<int> connectedVertices)
         {
-            Queue<int> visited = new Queue<int>();
+            bool[] visited = new bool[g.Order];
             Queue<int> adjQueue = new Queue<int>();
 
             adjQueue.Enqueue(0); //starting vertex
@@ -97,11 +100,11 @@ namespace GraphGeneration
             while (adjQueue.Count > 0)
             {
                 visitingVtx = adjQueue.Dequeue();
-                visited.Enqueue(visitingVtx);
+                visited[visitingVtx] = true;
 
                 for (int i = 0; i < g.Order; i++)
                 {
-                    if (!visited.Contains(i) 
+                    if (!visited[i] 
                         && g.IsAdjacent(visitingVtx, i))
                     {
                         adjQueue.Enqueue(i);
@@ -111,25 +114,31 @@ namespace GraphGeneration
 
             // any v not visited is not connected
             disconnectedVertices = new List<int>();
+            connectedVertices = new List<int>();
 
-            if (visited.Count == g.Order)
+            for (int i = 0; i < g.Order; i++)
+            {
+                if (visited[i])
+                    connectedVertices.Add(i);
+                else
+                    disconnectedVertices.Add(i);
+            }
+
+
+            if (connectedVertices.Count == g.Order)
             {
                 return true;
             }
             else
             {
-                for (int i = 0; i < g.Order; i++)
-                {
-                    if (!visited.Contains(i))
-                    {
-                        disconnectedVertices.Add(i);
-                    }
-                }
-
                 return false;
             }
         }
 
+        /*
+        * Runtime analysis for graph of order n and size m:
+        * 2m + 2n for bridging disconnected graphs
+        */
         public static Graph RandomConnectedGraph(int order)
         {
             Random random = new Random();
@@ -148,34 +157,24 @@ namespace GraphGeneration
 
             //add bridges to these vertices if not connected
             List<int> disconnectedVertices;
+            List<int> connectedVertices;
             
-            if (TestConnectivityBFS(graph, out disconnectedVertices))
+            if (TestConnectivityBFS(graph, out disconnectedVertices, out connectedVertices))
             {
                 graph.CalculateGraphParameters();
                 return graph;
             }
             else
             {
-                List<int> visited = new List<int>();
-
-                //find connected subgraph - add bridges to disconnectedVertices
-                for (int i = 0; i < order; i++)
-                {
-                    if (!disconnectedVertices.Contains(i))
-                    {
-                        visited.Add(i);
-                    }
-                }
-
-                while (visited.Count < order)
+                while (connectedVertices.Count < order)
                 {
                     //select random vertex from connected subgraph
-                    int randIndex = random.Next(visited.Count);
+                    int randIndex = random.Next(connectedVertices.Count);
                     int disconnVertex = disconnectedVertices.First();
 
-                    if (graph.AddEdge(visited[randIndex], disconnVertex))
+                    if (graph.AddEdge(connectedVertices[randIndex], disconnVertex))
                     {
-                        visited.Add(disconnVertex);
+                        connectedVertices.Add(disconnVertex);
                         disconnectedVertices.RemoveAt(0);
                     }
                 }
@@ -226,19 +225,6 @@ namespace GraphGeneration
             display += $"Size: {Size}\n";
             display += $"Max Degree: {MaxDegree}\n";
             display += $"Min Degree: {MinDegree}\n";
-
-            for (int i = 0; i < Order; i++)
-            {
-                display += $"{i}: ";
-
-                for (int j = 0; j < Order; j++)
-                {
-                    if (IsAdjacent(i, j))
-                        display += $"{j}  ";
-                }
-
-                display += "\n";
-            }
 
             return display;
         }

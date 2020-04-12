@@ -1,6 +1,6 @@
 ﻿using System;
 using GraphGeneration;
-using System.Timers;
+using System.Diagnostics;
 
 namespace graphgenerator
 {
@@ -10,12 +10,12 @@ namespace graphgenerator
         {
             int numOfNodes = Int32.Parse(args[0]);
             Console.WriteLine("making random graph!");
-            Timer timer = new Timer();
+            Stopwatch timer = new Stopwatch();
             timer.Start();
             Graph g = Graph.RandomConnectedGraph(numOfNodes);
             timer.Stop();
 
-            Console.WriteLine($"Graph of order {numOfNodes} created in {timer.Interval} ms");
+            Console.WriteLine($"Graph of order {numOfNodes} created in {timer.ElapsedMilliseconds} ms");
             Console.WriteLine(g);
         }
     }
