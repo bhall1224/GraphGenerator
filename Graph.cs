@@ -7,6 +7,8 @@ namespace GraphGeneration
     class Graph
     {
         private bool[,] _adjacencyMatrix;
+        private int[,] _distanceMatrix;
+
         public readonly List<Edge> EdgeSet;
         public readonly List<Vertex> VertexSet;
 
@@ -19,8 +21,9 @@ namespace GraphGeneration
         
         public Graph(int order)
         {
-            Order = order;
+            Order = order;            
             _adjacencyMatrix = new bool[order, order];
+            _distanceMatrix = new int[order, order];
             EdgeSet = new List<Edge>();
             VertexSet = new List<Vertex>();
 
@@ -46,6 +49,73 @@ namespace GraphGeneration
             else
             {
                 return false;
+            }
+        }
+
+        public void AddEccentricity(int i, int j, int distance)
+        {
+            _distanceMatrix[i, j] = distance;
+            _distanceMatrix[j, i] = distance;
+        }
+
+        public int GetEccentricity(int i, int j)
+        {
+            return _distanceMatrix[i, j];
+        }
+
+        private void CalculateGraphEccentricities()
+        {
+            bool[] visited = new bool[Order];
+            Queue<int> adjQueue = new Queue<int>();
+            List<int> vistedList = new List<int>();
+            Dictionary<int, int> vertexLevel = new Dictionary<int, int>();
+
+            adjQueue.Enqueue(0); //starting vertex
+            vertexLevel.Add(0, 0); // starting level is 0
+            int visitingVtx;
+            int level = 1;
+
+            while (adjQueue.Count > 0)
+            {
+                visitingVtx = adjQueue.Dequeue();
+                visited[visitingVtx] = true;
+                vistedList.Add(visitingVtx);
+
+                for (int i = 0; i < Order; i++)
+                {
+                    if (!visited[i] 
+                        && IsAdjacent(visitingVtx, i))
+                    {
+                        adjQueue.Enqueue(i);
+                        vertexLevel.Add(i, level); // for tracking distance later
+                    }
+
+                    if (IsAdjacent(visitingVtx, i))
+                    {
+                        AddEccentricity(visitingVtx, i, 1);
+
+                        int distance = level;
+                        foreach (int vertex in vistedList)
+                        {
+                            if (vertex != visitingVtx)
+                            {
+                                //distance is current depth - depth of compared vertex
+                                AddEccentricity(vertex, i, distance - vertexLevel.GetValueOrDefault(vertex));
+                            }
+                        }
+                    }
+                }
+
+                level++;
+            }
+
+            for (int i = 0; i < Order; i++)
+            {
+                for (int j = 0; j < Order; j++)
+                {
+                    if (_distanceMatrix[i, j] > VertexSet[i].Value)
+                    {}
+                }
             }
         }
 
