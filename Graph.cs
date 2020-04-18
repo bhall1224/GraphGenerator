@@ -101,21 +101,13 @@ namespace GraphGeneration
                             {
                                 //distance is current depth - depth of compared vertex
                                 AddEccentricity(vertex, i, distance - vertexLevel.GetValueOrDefault(vertex));
+                                //VertexSet[vertex]
                             }
                         }
                     }
                 }
 
                 level++;
-            }
-
-            for (int i = 0; i < Order; i++)
-            {
-                for (int j = 0; j < Order; j++)
-                {
-                    if (_distanceMatrix[i, j] > VertexSet[i].Value)
-                    {}
-                }
             }
         }
 
