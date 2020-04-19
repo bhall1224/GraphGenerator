@@ -13,6 +13,11 @@
             Vertex2 = v2;
         }
 
+        public override string ToString() 
+        {
+            return $"[{Vertex1}:{Vertex2}]";
+        }
+
         public override bool Equals(object obj)
         {
             if (!GetType().Equals(obj.GetType()))

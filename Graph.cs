@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 
 namespace GraphGeneration
 {
@@ -52,62 +53,37 @@ namespace GraphGeneration
             }
         }
 
-        public void AddEccentricity(int i, int j, int distance)
+        public void AddDistance(int rootV, int targetV, int distance, bool directional = false)
         {
-            _distanceMatrix[i, j] = distance;
-            _distanceMatrix[j, i] = distance;
+            _distanceMatrix[rootV, targetV] = distance;
+
+            if (!directional)
+                _distanceMatrix[targetV, rootV] = distance;
+
+            VertexSet[targetV].Eccentricity = distance;
         }
 
-        public int GetEccentricity(int i, int j)
+        public int GetDistance(int i, int j)
         {
             return _distanceMatrix[i, j];
         }
 
-        private void CalculateGraphEccentricities()
+        public void CalculateGraphEccentricities()
         {
-            bool[] visited = new bool[Order];
-            Queue<int> adjQueue = new Queue<int>();
-            List<int> vistedList = new List<int>();
-            Dictionary<int, int> vertexLevel = new Dictionary<int, int>();
+            List<int> vDistances = new List<int>();
+            int maxDistance;
 
-            adjQueue.Enqueue(0); //starting vertex
-            vertexLevel.Add(0, 0); // starting level is 0
-            int visitingVtx;
-            int level = 1;
-
-            while (adjQueue.Count > 0)
+            for (int i = 0; i < Order; i++)
             {
-                visitingVtx = adjQueue.Dequeue();
-                visited[visitingVtx] = true;
-                vistedList.Add(visitingVtx);
+                //populates Distance matrix
+                CaluclateDistancesFromRoot(i, out maxDistance);
 
-                for (int i = 0; i < Order; i++)
-                {
-                    if (!visited[i] 
-                        && IsAdjacent(visitingVtx, i))
-                    {
-                        adjQueue.Enqueue(i);
-                        vertexLevel.Add(i, level); // for tracking distance later
-                    }
+                vDistances.Add(maxDistance);
+            }
 
-                    if (IsAdjacent(visitingVtx, i))
-                    {
-                        AddEccentricity(visitingVtx, i, 1);
-
-                        int distance = level;
-                        foreach (int vertex in vistedList)
-                        {
-                            if (vertex != visitingVtx)
-                            {
-                                //distance is current depth - depth of compared vertex
-                                AddEccentricity(vertex, i, distance - vertexLevel.GetValueOrDefault(vertex));
-                                //VertexSet[vertex]
-                            }
-                        }
-                    }
-                }
-
-                level++;
+            for (int i = 0; i < Order; i++)
+            {
+                VertexSet[i].Eccentricity = vDistances[i];
             }
         }
 
@@ -148,12 +124,66 @@ namespace GraphGeneration
             return v1 != v2 && (_adjacencyMatrix[v1, v2] || _adjacencyMatrix[v2, v1]);
         }
 
+        public void CaluclateDistancesFromRoot(int root, out int maxDistance, bool bigraph = false)
+        {
+            //normal BFS data structures
+            bool[] visited = new bool[Order];
+            bool[] inQueue = new bool[Order];
+            Queue<int> adjQueue = new Queue<int>();
+            List<int> visitedList = new List<int>();
+
+            //starting vertex
+            adjQueue.Enqueue(root); 
+
+            //v pulled from Queue
+            int visitingVtx; 
+
+            maxDistance = 0;
+
+            while (adjQueue.Count > 0)
+            {
+                visitingVtx = adjQueue.Dequeue();
+                visited[visitingVtx] = true;
+
+                for (int i = 0; i < Order; i++)
+                {
+                    if (!visited[i] && !inQueue[i]
+                        && IsAdjacent(visitingVtx, i))
+                    {
+                        adjQueue.Enqueue(i);
+                        inQueue[i] = true;
+
+                        if (i == root && !bigraph)
+                        {
+                            AddDistance(root, i, 0);
+                        }
+                        else if (IsAdjacent(i, root))
+                        {
+                            AddDistance(root, i, 1);
+                        }
+                        else
+                        {
+                            int distance = VertexSet[visitingVtx].Eccentricity + 1;
+                            AddDistance(root, i, distance);
+
+                            if (distance > maxDistance)
+                                maxDistance = distance;
+                        }
+                    }
+                }
+
+                if (visitedList.Count + adjQueue.Count == Order)
+                    return;
+            }
+        }
+
         private static bool TestConnectivityBFS(
             Graph g, 
             out List<int> disconnectedVertices, 
             out List<int> connectedVertices)
         {
             bool[] visited = new bool[g.Order];
+            bool[] inQueue = new bool[g.Order];
             Queue<int> adjQueue = new Queue<int>();
 
             adjQueue.Enqueue(0); //starting vertex
@@ -166,10 +196,11 @@ namespace GraphGeneration
 
                 for (int i = 0; i < g.Order; i++)
                 {
-                    if (!visited[i] 
+                    if (!visited[i] && !inQueue[i]
                         && g.IsAdjacent(visitingVtx, i))
                     {
                         adjQueue.Enqueue(i);
+                        inQueue[i] = true;
                     }
                 }
             }
@@ -206,7 +237,6 @@ namespace GraphGeneration
             Random random = new Random();
 
             int size = random.Next(order - 1, order * (order - 1) / 2);
-            
             Graph graph = new Graph(order);
             
             while (graph.Size < size)
@@ -221,12 +251,7 @@ namespace GraphGeneration
             List<int> disconnectedVertices;
             List<int> connectedVertices;
             
-            if (TestConnectivityBFS(graph, out disconnectedVertices, out connectedVertices))
-            {
-                graph.CalculateGraphParameters();
-                return graph;
-            }
-            else
+            if (!TestConnectivityBFS(graph, out disconnectedVertices, out connectedVertices))
             {
                 while (connectedVertices.Count < order)
                 {
@@ -240,10 +265,11 @@ namespace GraphGeneration
                         disconnectedVertices.RemoveAt(0);
                     }
                 }
-
-                graph.CalculateGraphParameters();
-                return graph;
             }
+
+            graph.CalculateGraphParameters();
+            graph.CalculateGraphEccentricities();
+            return graph;
         }
 
         public static Graph CompleteGraph(int order)
@@ -287,6 +313,20 @@ namespace GraphGeneration
             display += $"Size: {Size}\n";
             display += $"Max Degree: {MaxDegree}\n";
             display += $"Min Degree: {MinDegree}\n";
+
+            display += "Vertex set: [ \n";
+            foreach (Vertex v in VertexSet)
+            {
+                display += v.ToString() + "\n";
+            }
+            display += "]\n";
+
+            display += "Edge set: [\n";
+            foreach (Edge e in EdgeSet)
+            {
+                display += e.ToString();
+            }
+            display += "]\n";
 
             return display;
         }
