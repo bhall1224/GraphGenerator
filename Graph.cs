@@ -75,6 +75,7 @@ namespace GraphGeneration
 
             for (int i = 0; i < Order; i++)
             {
+                VertexSet[i].Eccentricity = 0;
                 //populates Distance matrix
                 CaluclateDistancesFromRoot(i, out maxDistance);
 
@@ -160,6 +161,8 @@ namespace GraphGeneration
                         else if (IsAdjacent(i, root))
                         {
                             AddDistance(root, i, 1);
+                            if (maxDistance < 1)
+                                maxDistance = 1;
                         }
                         else
                         {
@@ -268,7 +271,6 @@ namespace GraphGeneration
             }
 
             graph.CalculateGraphParameters();
-            graph.CalculateGraphEccentricities();
             return graph;
         }
 
@@ -314,20 +316,22 @@ namespace GraphGeneration
             display += $"Max Degree: {MaxDegree}\n";
             display += $"Min Degree: {MinDegree}\n";
 
-            display += "Vertex set: [ \n";
-            foreach (Vertex v in VertexSet)
+            if (Order < 100)
             {
-                display += v.ToString() + "\n";
-            }
-            display += "]\n";
+                display += "Vertex set: [ \n";
+                foreach (Vertex v in VertexSet)
+                {
+                    display += v.ToString() + "\n";
+                }
+                display += "\n]\n";
 
-            display += "Edge set: [\n";
-            foreach (Edge e in EdgeSet)
-            {
-                display += e.ToString();
+                display += "Edge set: [\n";
+                foreach (Edge e in EdgeSet)
+                {
+                    display += e.ToString();
+                }
+            display += "\n]\n";
             }
-            display += "]\n";
-
             return display;
         }
     }
