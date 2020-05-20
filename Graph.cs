@@ -32,6 +32,196 @@ namespace GraphGeneration
                 VertexSet.Add(new Vertex(i));
         }
 
+        /*
+        * Runtime analysis for graph of order n and size m:
+        * 2m + 2n for bridging disconnected graphs
+        */
+        public static Graph RandomConnectedGraph(int order)
+        {
+            Random random = new Random();
+
+            int size = random.Next(order - 1, order * (order - 1) / 2);
+            Graph graph = new Graph(order);
+            
+            while (graph.Size < size)
+            {
+                int v1 = random.Next(order);
+                int v2 = random.Next(order);
+                                
+                graph.AddEdge(v1, v2);
+            }            
+
+            //add bridges to these vertices if not connected
+            List<int> disconnectedVertices;
+            List<int> connectedVertices;
+            
+            if (!TestConnectivityBFS(graph, out disconnectedVertices, out connectedVertices))
+            {
+                while (connectedVertices.Count < order)
+                {
+                    //select random vertex from connected subgraph
+                    int randIndex = random.Next(connectedVertices.Count);
+                    int disconnVertex = disconnectedVertices.First();
+
+                    if (graph.AddEdge(connectedVertices[randIndex], disconnVertex))
+                    {
+                        connectedVertices.Add(disconnVertex);
+                        disconnectedVertices.RemoveAt(0);
+                    }
+                }
+            }
+
+            graph.CalculateGraphParameters();
+            return graph;
+        }
+
+        /*
+        * Uses Depth-First-Search to create a random u - v Path
+        */
+        public static Graph RandomPath(int order)
+        {
+            Graph g = new Graph(order);
+
+            /*
+            * using arrays and lists to maximize search efficiency
+            * while keeping the Stack functionality for DFS
+            */
+            bool[] visited = new bool[order];
+            Stack<int> adjStack = new Stack<int>();
+            List<int> neighborList = new List<int>();
+
+            Random random = new Random();
+
+            // add root
+            adjStack.Push(0);
+
+            int visitingVtx;
+
+            while (adjStack.Count > 0)
+            {
+                visitingVtx = adjStack.Pop();
+                visited[visitingVtx] = true;
+
+                for (int i = 0; i < order; i++)
+                    if (i != visitingVtx && !visited[i])
+                        neighborList.Add(i);
+
+                //select one random neighbor and add edge
+                if (neighborList.Count > 0)
+                {
+                    int randIndex = random.Next(neighborList.Count);
+                    g.AddEdge(visitingVtx, neighborList[randIndex]);
+                    adjStack.Push(neighborList[randIndex]);
+                }
+
+                neighborList.Clear();
+            }
+            
+
+            return g;
+        }
+
+        /*
+        * Uses Breadth-First-Search to create random tree graph.
+        * Guarantees connected acyclic graph.
+        */
+        public static Graph RandomTree(int order)
+        {
+            Graph g = new Graph(order);
+
+            /*
+            * using arrays and lists to maximize search efficiency
+            * while keeping the Queue functionality for BFS
+            */
+            bool[] visited = new bool[order];
+            bool[] inQueue = new bool[order];
+            Queue<int> adjQueue = new Queue<int>();
+            List<int> branchList = new List<int>();
+
+            Random random = new Random();
+
+            //starting vertex
+            adjQueue.Enqueue(0); 
+
+            //v pulled from Queue
+            int visitingVtx; 
+
+            //random number of branches from a given vertex
+            int branches = 0;
+            int branchCount = 0;
+            while (adjQueue.Count > 0)
+            {
+                visitingVtx = adjQueue.Dequeue();
+                visited[visitingVtx] = true;
+
+                for (int i = 0; i < order; i++)
+                {
+                    //add potential branch
+                    if (i != visitingVtx && !visited[i] && !inQueue[i])
+                        branchList.Add(i);
+                }
+                
+                if (branchList.Count > 0)
+                {
+                    //some non-empty subset of potential branches will be added
+                    branches = random.Next(1, branchList.Count);
+                    while (branchCount < branches)
+                    {
+                        //randomly choose next vtx to branch paths
+                        int randIndex = random.Next(branchList.Count);
+                        g.AddEdge(visitingVtx, branchList[randIndex]);
+
+                        //continue to this vtx in search
+                        adjQueue.Enqueue(branchList[randIndex]);
+                        inQueue[ branchList[randIndex] ] = true;
+
+                        //we want to remove this vtx as a potential branch
+                        branchList.RemoveAt(randIndex);
+                        branchCount++;
+                    }
+                }
+
+                branchList.Clear();
+                branchCount = 0;
+                branches = 0;
+            }
+
+            return g;
+        }
+
+        public static Graph CompleteGraph(int order)
+        {
+            Graph g = new Graph(order);
+
+            for (int i = 0; i < order; i++)
+            {
+                for (int j = i + 1; j < order; j++)
+                {
+                    g.AddEdge(i, j);
+                }
+            }
+
+            return g;
+        }
+
+        public static Graph Copy(Graph graph)
+        {
+            Graph g = new Graph(graph.Order)
+            {
+                Size = graph.Size,
+                MaxDegree = graph.MaxDegree,
+                DegreeSum = graph.DegreeSum
+            };
+
+            //copy hash set contents
+            foreach (Edge e in graph.EdgeSet)
+            {
+                g.AddEdge(e.Vertex1, e.Vertex2);
+            }
+
+            return g;
+        }      
+
         public bool AddEdge(int v1, int v2, bool directional = false)
         {
             Edge e = new Edge(v1, v2);
@@ -70,21 +260,16 @@ namespace GraphGeneration
 
         public void CalculateGraphEccentricities()
         {
-            List<int> vDistances = new List<int>();
             int maxDistance;
 
             for (int i = 0; i < Order; i++)
             {
                 VertexSet[i].Eccentricity = 0;
+
                 //populates Distance matrix
                 CaluclateDistancesFromRoot(i, out maxDistance);
 
-                vDistances.Add(maxDistance);
-            }
-
-            for (int i = 0; i < Order; i++)
-            {
-                VertexSet[i].Eccentricity = vDistances[i];
+                VertexSet[i].Eccentricity = maxDistance;
             }
         }
 
@@ -125,13 +310,15 @@ namespace GraphGeneration
             return v1 != v2 && (_adjacencyMatrix[v1, v2] || _adjacencyMatrix[v2, v1]);
         }
 
+        /*
+        * Uses Breadth-First-Search to find distances of all u - v distances from root u
+        */
         public void CaluclateDistancesFromRoot(int root, out int maxDistance, bool bigraph = false)
         {
             //normal BFS data structures
             bool[] visited = new bool[Order];
             bool[] inQueue = new bool[Order];
             Queue<int> adjQueue = new Queue<int>();
-            List<int> visitedList = new List<int>();
 
             //starting vertex
             adjQueue.Enqueue(root); 
@@ -161,6 +348,8 @@ namespace GraphGeneration
                         else if (IsAdjacent(i, root))
                         {
                             AddDistance(root, i, 1);
+
+                            //only if we haven't assigned yet
                             if (maxDistance < 1)
                                 maxDistance = 1;
                         }
@@ -174,9 +363,6 @@ namespace GraphGeneration
                         }
                     }
                 }
-
-                if (visitedList.Count + adjQueue.Count == Order)
-                    return;
             }
         }
 
@@ -229,83 +415,7 @@ namespace GraphGeneration
             {
                 return false;
             }
-        }
-
-        /*
-        * Runtime analysis for graph of order n and size m:
-        * 2m + 2n for bridging disconnected graphs
-        */
-        public static Graph RandomConnectedGraph(int order)
-        {
-            Random random = new Random();
-
-            int size = random.Next(order - 1, order * (order - 1) / 2);
-            Graph graph = new Graph(order);
-            
-            while (graph.Size < size)
-            {
-                int v1 = random.Next(order);
-                int v2 = random.Next(order);
-                                
-                graph.AddEdge(v1, v2);
-            }            
-
-            //add bridges to these vertices if not connected
-            List<int> disconnectedVertices;
-            List<int> connectedVertices;
-            
-            if (!TestConnectivityBFS(graph, out disconnectedVertices, out connectedVertices))
-            {
-                while (connectedVertices.Count < order)
-                {
-                    //select random vertex from connected subgraph
-                    int randIndex = random.Next(connectedVertices.Count);
-                    int disconnVertex = disconnectedVertices.First();
-
-                    if (graph.AddEdge(connectedVertices[randIndex], disconnVertex))
-                    {
-                        connectedVertices.Add(disconnVertex);
-                        disconnectedVertices.RemoveAt(0);
-                    }
-                }
-            }
-
-            graph.CalculateGraphParameters();
-            return graph;
-        }
-
-        public static Graph CompleteGraph(int order)
-        {
-            Graph g = new Graph(order);
-
-            for (int i = 0; i < order; i++)
-            {
-                for (int j = i + 1; j < order; j++)
-                {
-                    g.AddEdge(i, j);
-                }
-            }
-
-            return g;
-        }
-
-        public static Graph Copy(Graph graph)
-        {
-            Graph g = new Graph(graph.Order)
-            {
-                Size = graph.Size,
-                MaxDegree = graph.MaxDegree,
-                DegreeSum = graph.DegreeSum
-            };
-
-            //copy hash set contents
-            foreach (Edge e in graph.EdgeSet)
-            {
-                g.AddEdge(e.Vertex1, e.Vertex2);
-            }
-
-            return g;
-        }        
+        }  
 
         public override string ToString()
         {
@@ -321,16 +431,16 @@ namespace GraphGeneration
                 display += "Vertex set: [ \n";
                 foreach (Vertex v in VertexSet)
                 {
-                    display += v.ToString() + "\n";
+                    display += "\t" + v.ToString() + "\n";
                 }
-                display += "\n]\n";
+                display += "]\n";
 
                 display += "Edge set: [\n";
                 foreach (Edge e in EdgeSet)
                 {
-                    display += e.ToString();
+                    display += "\t" + e.ToString() + "\n";
                 }
-            display += "\n]\n";
+            display += "]\n";
             }
             return display;
         }
